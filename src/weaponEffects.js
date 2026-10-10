@@ -12,6 +12,29 @@ function getCombatElements(targetDockId = 'classicEnemyHpDock') {
   return { layer, targetHpDock, enemyHpDock: targetHpDock, enemyHpFill };
 }
 
+// Generatore procedurale di coordinate a zig-zag per veri fulmini
+function createJaggedPoints(x1, y1, x2, y2, segments = 12, maxOffset = 26) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return `${x1},${y1} ${x2},${y2}`;
+
+  const nx = -dy / dist;
+  const ny = dx / dist;
+
+  const points = [[x1, y1]];
+  for (let i = 1; i < segments; i++) {
+    const progress = i / segments;
+    const baseX = x1 + dx * progress;
+    const baseY = y1 + dy * progress;
+    const damp = Math.sin(progress * Math.PI); // Preserva precisione iniziale e finale
+    const offset = (Math.random() - 0.5) * 2 * maxOffset * damp;
+    points.push([baseX + nx * offset, baseY + ny * offset]);
+  }
+  points.push([x2, y2]);
+  return points.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+}
+
 // ----------------------------------------------------------------------------
 // 1. ARCO-X BALISTICO (arrow_barrage)
 // ----------------------------------------------------------------------------
@@ -36,14 +59,14 @@ function executeArrowBarrage({ level, targetX, targetY, startX, startY, onComple
       arrow.className = 'flight-arrow-screen';
       layer.appendChild(arrow);
 
-      const spawnX = startX + (Math.random() - 0.5) * 60;
+      const spawnX = startX + (Math.random() - 0.5) * 90;
       const hitX = targetX + (Math.random() - 0.5) * 30;
       const dx = hitX - spawnX;
       const dy = targetY - startY;
       const angleRad = Math.atan2(dy, dx) + Math.PI / 2;
 
       arrow.animate([
-        { transform: `translate3d(${spawnX}px, ${startY}px, 0) rotate(${angleRad}rad) scale(1.3)`, opacity: 0.95 },
+        { transform: `translate3d(${spawnX}px, ${startY}px, 0) rotate(${angleRad}rad) scale(1.4)`, opacity: 0.95 },
         { transform: `translate3d(${hitX}px, ${targetY}px, 0) rotate(${angleRad}rad) scale(0.65)`, opacity: 1 }
       ], { duration: 250, easing: 'cubic-bezier(0.2, 0.8, 0.4, 1)', fill: 'forwards' }).onfinish = () => {
         arrow.remove();
@@ -81,9 +104,8 @@ function executeLaserSweep({
 
   const beamColor = isEnemyAttacking ? '#f43f5e' : '#00f2fe';
   const glowColor = isEnemyAttacking ? '#fda4af' : '#a5f3fc';
-  const beamWidth = level === 3 ? 10 : (level === 2 ? 7 : 5);
+  const beamWidth = level === 3 ? 12 : (level === 2 ? 8 : 6);
 
-  // Contenitore SVG scalato a tutto schermo
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.style.position = 'fixed';
   svg.style.top = '0';
@@ -93,37 +115,33 @@ function executeLaserSweep({
   svg.style.pointerEvents = 'none';
   svg.style.zIndex = '999998';
 
-  // Alone esterno del fascio laser
   const beamGlow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
   beamGlow.setAttribute('stroke', beamColor);
   beamGlow.setAttribute('stroke-width', (beamWidth * 2.8).toString());
   beamGlow.setAttribute('stroke-linecap', 'round');
-  beamGlow.setAttribute('opacity', '0.65');
-  beamGlow.style.filter = `drop-shadow(0 0 14px ${beamColor})`;
+  beamGlow.setAttribute('opacity', '0.7');
+  beamGlow.style.filter = `drop-shadow(0 0 16px ${beamColor})`;
 
-  // Anima pura incandescente del fascio laser
   const beamCore = document.createElementNS('http://www.w3.org/2000/svg', 'line');
   beamCore.setAttribute('stroke', '#ffffff');
   beamCore.setAttribute('stroke-width', beamWidth.toString());
   beamCore.setAttribute('stroke-linecap', 'round');
 
-  // Sorgente / Bocca di fuoco fissa in vetta o al fondo
   const emitterCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   emitterCircle.setAttribute('cx', emitterX.toString());
   emitterCircle.setAttribute('cy', emitterY.toString());
-  emitterCircle.setAttribute('r', '14');
+  emitterCircle.setAttribute('r', '16');
   emitterCircle.setAttribute('fill', '#ffffff');
   emitterCircle.setAttribute('stroke', beamColor);
   emitterCircle.setAttribute('stroke-width', '4');
-  emitterCircle.style.filter = `drop-shadow(0 0 16px ${beamColor})`;
+  emitterCircle.style.filter = `drop-shadow(0 0 20px ${beamColor})`;
 
-  // Punta al plasma di taglio sulla barra vita
   const impactCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  impactCircle.setAttribute('r', '12');
+  impactCircle.setAttribute('r', '13');
   impactCircle.setAttribute('fill', '#ffffff');
   impactCircle.setAttribute('stroke', glowColor);
   impactCircle.setAttribute('stroke-width', '4');
-  impactCircle.style.filter = `drop-shadow(0 0 20px ${beamColor})`;
+  impactCircle.style.filter = `drop-shadow(0 0 24px ${beamColor})`;
 
   svg.appendChild(beamGlow);
   svg.appendChild(beamCore);
@@ -145,16 +163,16 @@ function executeLaserSweep({
     spark.style.height = '4px';
     spark.style.borderRadius = '50%';
     spark.style.backgroundColor = Math.random() > 0.4 ? '#ffffff' : beamColor;
-    spark.style.boxShadow = `0 0 8px ${beamColor}`;
+    spark.style.boxShadow = `0 0 10px ${beamColor}`;
     spark.style.pointerEvents = 'none';
     spark.style.zIndex = '999999';
     layer.appendChild(spark);
 
     const destX = (Math.random() - 0.5) * 60;
-    const destY = isEnemyAttacking ? (Math.random() * -30 - 10) : (Math.random() * 30 + 10);
+    const destY = isEnemyAttacking ? (Math.random() * -35 - 10) : (Math.random() * 35 + 10);
 
     spark.animate([
-      { transform: 'translate(0, 0) scale(1.5)', opacity: 1 },
+      { transform: 'translate(0, 0) scale(1.6)', opacity: 1 },
       { transform: `translate(${destX}px, ${destY}px) scale(0)`, opacity: 0 }
     ], { duration: 220, easing: 'ease-out' }).onfinish = () => spark.remove();
   }
@@ -163,7 +181,6 @@ function executeLaserSweep({
     const elapsed = now - animStart;
     const progress = Math.min(1, elapsed / durationMs);
 
-    // Movimento dell'estremità inferiore del laser lungo il segmento HP
     const curX = startEdgeX + (targetEdgeX - startEdgeX) * progress;
 
     beamGlow.setAttribute('x1', emitterX.toString());
@@ -179,7 +196,7 @@ function executeLaserSweep({
     impactCircle.setAttribute('cx', curX.toString());
     impactCircle.setAttribute('cy', targetY.toString());
 
-    if (now - lastSparkTime > 35) {
+    if (now - lastSparkTime > 30) {
       spawnSpark(curX, targetY);
       lastSparkTime = now;
     }
@@ -197,42 +214,114 @@ function executeLaserSweep({
 }
 
 // ----------------------------------------------------------------------------
-// 3. TORRE TESLA / FULMINE (lightning_strike & tesla_arc)
+// 3. VERO FULMINE PROCEDURALE A ZIG-ZAG (lightning_strike, tesla_arc & orbital_pillar)
 // ----------------------------------------------------------------------------
-function executeTeslaLightning({ level, targetX, targetY, onComplete, targetDockId, isEnemyAttacking = false }) {
+function executeTeslaLightning({ level, startX, startY, targetX, targetY, onComplete, targetDockId, isEnemyAttacking = false }) {
   const { layer, targetHpDock } = getCombatElements(targetDockId);
   if (!layer || !targetHpDock) return onComplete?.();
 
   try { playSound('cannon_hit'); } catch (_) {}
 
-  const boltCount = level === 3 ? 3 : (level === 2 ? 2 : 1);
   const boltColor = isEnemyAttacking ? '#f43f5e' : '#00f2fe';
-  const boltTop = 0;
-  const boltHeight = targetY;
+  const glowColor = isEnemyAttacking ? '#fda4af' : '#7dd3fc';
+  const boltCount = level === 3 ? 3 : (level === 2 ? 2 : 1);
 
-  for (let b = 0; b < boltCount; b++) {
-    const bolt = document.createElement('div');
-    bolt.style.position = 'fixed';
-    bolt.style.top = `${boltTop}px`;
-    bolt.style.left = `${targetX - 4 + (b - 1) * 12}px`;
-    bolt.style.width = '8px';
-    bolt.style.height = `${boltHeight}px`;
-    bolt.style.background = `linear-gradient(180deg, #ffffff 0%, ${boltColor} 60%, transparent 100%)`;
-    bolt.style.boxShadow = `0 0 25px ${boltColor}, 0 0 40px #ffffff`;
-    bolt.style.pointerEvents = 'none';
-    bolt.style.zIndex = '999999';
-    layer.appendChild(bolt);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.style.position = 'fixed';
+  svg.style.top = '0';
+  svg.style.left = '0';
+  svg.style.width = '100vw';
+  svg.style.height = '100dvh';
+  svg.style.pointerEvents = 'none';
+  svg.style.zIndex = '999999';
+  layer.appendChild(svg);
 
-    setTimeout(() => {
-      bolt.remove();
-    }, 180 + b * 60);
+  function createBoltGroup(origX, origY, destX, destY, isBranch = false) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    glow.setAttribute('stroke', boltColor);
+    glow.setAttribute('stroke-width', isBranch ? '6' : '12');
+    glow.setAttribute('fill', 'none');
+    glow.setAttribute('stroke-linecap', 'round');
+    glow.setAttribute('stroke-linejoin', 'round');
+    glow.setAttribute('opacity', '0.7');
+    glow.style.filter = `drop-shadow(0 0 14px ${boltColor})`;
+
+    const core = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    core.setAttribute('stroke', '#ffffff');
+    core.setAttribute('stroke-width', isBranch ? '2' : '3.5');
+    core.setAttribute('fill', 'none');
+    core.setAttribute('stroke-linecap', 'round');
+    core.setAttribute('stroke-linejoin', 'round');
+
+    g.appendChild(glow);
+    g.appendChild(core);
+
+    const updatePoints = () => {
+      const pts = createJaggedPoints(origX, origY, destX, destY, isBranch ? 6 : 14, isBranch ? 15 : 28);
+      glow.setAttribute('points', pts);
+      core.setAttribute('points', pts);
+    };
+
+    updatePoints();
+    return { g, updatePoints };
   }
 
+  // Creazione dei fasci principali e ramificazioni laterali
+  const bolts = [];
+  for (let b = 0; b < boltCount; b++) {
+    const offsetX = (b - (boltCount - 1) / 2) * 20;
+    const destX = targetX + offsetX;
+    const origX = startX + offsetX * 1.5;
+
+    // Fulmine primario
+    const mainBolt = createBoltGroup(origX, startY, destX, targetY, false);
+    svg.appendChild(mainBolt.g);
+    bolts.push(mainBolt);
+
+    // Ramo 1
+    const midY1 = startY + (targetY - startY) * 0.4;
+    const midX1 = origX + (destX - origX) * 0.4;
+    const branch1 = createBoltGroup(midX1, midY1, midX1 + (Math.random() > 0.5 ? 55 : -55), midY1 + (isEnemyAttacking ? 45 : -45), true);
+    svg.appendChild(branch1.g);
+    bolts.push(branch1);
+
+    // Ramo 2
+    const midY2 = startY + (targetY - startY) * 0.7;
+    const midX2 = origX + (destX - origX) * 0.7;
+    const branch2 = createBoltGroup(midX2, midY2, midX2 + (Math.random() > 0.5 ? -60 : 60), midY2 + (isEnemyAttacking ? 40 : -40), true);
+    svg.appendChild(branch2.g);
+    bolts.push(branch2);
+  }
+
+  // Stella al plasma di impatto sulla barra vita
+  const impactBurst = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  impactBurst.setAttribute('cx', targetX.toString());
+  impactBurst.setAttribute('cy', targetY.toString());
+  impactBurst.setAttribute('r', '18');
+  impactBurst.setAttribute('fill', '#ffffff');
+  impactBurst.setAttribute('stroke', glowColor);
+  impactBurst.setAttribute('stroke-width', '4');
+  impactBurst.style.filter = `drop-shadow(0 0 25px ${boltColor})`;
+  svg.appendChild(impactBurst);
+
+  targetHpDock.classList.remove('bar-hit-flash', 'bar-shiver');
+  void targetHpDock.offsetWidth;
   targetHpDock.classList.add('bar-hit-flash', 'bar-shiver');
-  setTimeout(() => {
-    targetHpDock.classList.remove('bar-hit-flash', 'bar-shiver');
-    onComplete?.();
-  }, 280);
+
+  // Crackle animation: ricalcola la forma a zig-zag ogni 50ms per farlo vibrare come un vero fulmine
+  let crackleCount = 0;
+  const crackleTimer = setInterval(() => {
+    bolts.forEach(b => b.updatePoints());
+    crackleCount++;
+    if (crackleCount >= 5) {
+      clearInterval(crackleTimer);
+      svg.remove();
+      targetHpDock.classList.remove('bar-hit-flash', 'bar-shiver');
+      onComplete?.();
+    }
+  }, 45);
 }
 
 // ----------------------------------------------------------------------------
@@ -274,7 +363,7 @@ function executeMissileSalvo({ level, startX, startY, hpLeft, hpWidth, currentHp
       missile.animate([
         { transform: `translate3d(${spawnX}px, ${startY}px, 0) rotate(${startAngle}deg) scale(1.2)`, opacity: 1 },
         { transform: `translate3d(${hitX}px, ${hitY}px, 0) rotate(${baseRot}deg) scale(0.7)`, opacity: 1 }
-      ], { duration: 240, easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)', fill: 'forwards' }).onfinish = () => {
+      ], { duration: 250, easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)', fill: 'forwards' }).onfinish = () => {
         missile.remove();
         targetHpDock.classList.remove('bar-hit-flash', 'bar-shiver');
         void targetHpDock.offsetWidth;
@@ -368,7 +457,7 @@ function executeGatlingSpray({ level, targetX, targetY, startX, startY, onComple
       bullet.style.zIndex = '999999';
       layer.appendChild(bullet);
 
-      const spawnX = startX + (Math.random() - 0.5) * 30;
+      const spawnX = startX + (Math.random() - 0.5) * 40;
       const hitX = targetX + (Math.random() - 0.5) * 20;
 
       bullet.animate([
@@ -398,7 +487,7 @@ function executeHeavyCannon({ level, targetX, targetY, startX, startY, onComplet
 
   try { playSound('cannon_hit'); } catch (_) {}
 
-  const ballSize = 22 + level * 5;
+  const ballSize = 24 + level * 6;
   const ball = document.createElement('div');
   ball.style.position = 'fixed';
   ball.style.width = `${ballSize}px`;
@@ -424,7 +513,7 @@ function executeHeavyCannon({ level, targetX, targetY, startX, startY, onComplet
 }
 
 // ============================================================================
-// DISPATCHER PRINCIPALE DEI COLPI (BIDIREZIONALE SIMMETRICO)
+// DISPATCHER PRINCIPALE DEI COLPI (ORIGINI FORZATE FUORI DALLO SCHERMO)
 // ============================================================================
 export function fireWeaponCombatVFX(weapon, level = 1, { currentHp, maxHp, damage, onComplete, isEnemyAttacking = false }) {
   const targetDockId = isEnemyAttacking ? 'classicPlayerHpDock' : 'classicEnemyHpDock';
@@ -437,28 +526,11 @@ export function fireWeaponCombatVFX(weapon, level = 1, { currentHp, maxHp, damag
   const hpWidth = rect.width;
   const targetY = rect.top + rect.height / 2;
 
-  // Coordinate di partenza fisse ed estreme:
-  // Se spara il nemico: parte dalla vetta assoluta (y = 15px) e mira in basso.
-  // Se spara il giocatore: parte dal fondo dello schermo e mira in alto.
-  const enemyDock = document.getElementById('classicEnemyHpDock');
-  const playerDock = document.getElementById('classicPlayerHpDock');
-
-  let startX = window.innerWidth / 2;
-  let startY = isEnemyAttacking ? 15 : (window.innerHeight - 15);
-
-  if (isEnemyAttacking) {
-    if (enemyDock) {
-      const eRect = enemyDock.getBoundingClientRect();
-      startX = eRect.left + eRect.width / 2;
-      startY = eRect.top + eRect.height / 2;
-    }
-  } else {
-    if (playerDock) {
-      const pRect = playerDock.getBoundingClientRect();
-      startX = pRect.left + pRect.width / 2;
-      startY = pRect.top + pRect.height / 2;
-    }
-  }
+  // ORIGINE RIGOROSAMENTE FUORI DAL DISPLAY:
+  // - Nemico che attacca: parte da sopra lo schermo (y = -60px)
+  // - Giocatore che attacca: parte da sotto lo schermo (y = window.innerHeight + 60px)
+  const startX = window.innerWidth / 2;
+  const startY = isEnemyAttacking ? -60 : (window.innerHeight + 60);
 
   // Estremità vive della barra HP da incidere
   const startEdgeX = hpLeft + hpWidth * (Math.max(0, currentHp) / (maxHp || 1));
@@ -482,10 +554,12 @@ export function fireWeaponCombatVFX(weapon, level = 1, { currentHp, maxHp, damag
     });
   }
 
-  // 2. TORRE TESLA / FULMINE
+  // 2. VERO FULMINE PROCEDURALE A ZIG-ZAG
   if (fx === 'lightning_strike' || fx === 'tesla_arc' || fx === 'orbital_pillar') {
     return executeTeslaLightning({
       level,
+      startX,
+      startY,
       targetX: midPointX,
       targetY,
       onComplete,
